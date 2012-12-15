@@ -1,0 +1,1 @@
+A quick and dirty bingo game by [Conduit](http://hackage.haskell.org/package/conduit-0.5.5).
