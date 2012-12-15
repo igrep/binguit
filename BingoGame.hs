@@ -1,19 +1,26 @@
 module BingoGame
   (generateTable
-  ,BingoTable) where
+  ,BingoTable
+  ,showTable) where
 
 import Control.Applicative
 import System.Random
 import qualified Data.Map as Map
 import Data.Map (Map)
 
-newtype BingoTable = BingoTable (Map Point Cell)
-type Point = (Char, Int)
+type BingoTable = Map Point Cell
+type Point = (Int, Int)
 data Cell =
   Cell Int Bool
   | CenterCell
 
+showTable :: BingoTable -> String
+showTable b = Map.foldWithKey f "" b
+  where
+    f _ v b' = show v ++ b'
+
 instance Show Cell where
+  -- TODO: How to colorize?
   show CenterCell = "(  )"
   show (Cell i m) =
     if m
@@ -27,13 +34,24 @@ instance Show Cell where
 --       Change the range of generated value by column
 generateTable :: RandomGen g => g -> BingoTable
 generateTable g =
-  BingoTable $ Map.fromList $ map f $ zip points $ randoms g
+  Map.fromList $ map f $ zip points $ randoms g
   where
     f (p, i) = (p, mkCellAt p i)
 
 mkCellAt :: Point -> Int -> Cell
-mkCellAt ('N', 3) _ = CenterCell
-mkCellAt p@(x, _y) i = Cell i False
+mkCellAt (x, y) i
+  | x == center && y == center = CenterCell
+  | otherwise = Cell v False
+  where
+    v = (i `mod` 75) + 1
+
+size :: Int
+size = 5
+
+center :: Int
+center = d + m
+  where
+    (d, m) = size `divMod` 2
 
 points :: [Point]
-points = (,) <$> "BINGO" <*> [1..5]
+points = (,) <$> [1..size] <*> [1..size]
