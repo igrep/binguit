@@ -14,10 +14,13 @@ data Cell =
   Cell Int Bool
   | CenterCell
 
+-- TODO: use difflist
 showTable :: BingoTable -> String
-showTable b = Map.foldWithKey f "" b
+showTable b = snd $ Map.foldWithKey f (1, "") b
   where
-    f _ v b' = show v ++ b'
+    f (x, _) cell (lastKey, ac)
+      | x == lastKey = ( lastKey, ac ++ show cell )
+      | otherwise = ( x, ac ++ "\n" ++ show cell )
 
 instance Show Cell where
   -- TODO: How to colorize?
