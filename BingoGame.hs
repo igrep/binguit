@@ -39,14 +39,15 @@ generateTable :: RandomGen g => g -> BingoTable
 generateTable g =
   Map.fromList $ map f $ zip points $ randoms g
   where
-    f (p, i) = (p, mkCellAt p i)
+    f (p, i) = (p, mkCellAt p (( i `mod` 75 ) + 1 :: Int))
 
 mkCellAt :: Point -> Int -> Cell
 mkCellAt (x, y) i
   | x == center && y == center = CenterCell
-  | otherwise = Cell v False
-  where
-    v = (i `mod` 75) + 1
+  | otherwise = Cell i False
+
+{-mark :: BingoTable -> Int -> BingoTable-}
+{-mark bt i -}
 
 size :: Int
 size = 5
