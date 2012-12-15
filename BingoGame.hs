@@ -1,31 +1,32 @@
 module BingoGame
   (newGame
   ,BingoGame
-  ,showTable) where
+  ,markCell) where
 
 import Control.Applicative
 import System.Random
 import qualified Data.Map as Map
 import Data.Map (Map)
 
-data BingoGame =
-  BingoGame
-    { table :: BingoTable
-    , invertedTable :: InvertedTable }
+data BingoGame = BingoGame BingoTable InvertedTable
+{-data BingoGame =-}
+  {-BingoGame-}
+    {-{ table :: BingoTable-}
+    {-, invertedTable :: InvertedTable }-}
 type BingoTable = Map Point Cell
 type InvertedTable = Map Int [Point]
 type Point = (Int, Int)
 data Cell =
-  Cell { value :: Int, isMarked :: Bool }
+  Cell { value :: Int, _isMarked :: Bool }
   | CenterCell
 
 -- TODO: use difflist
-showTable :: BingoTable -> String
-showTable b = snd $ Map.foldWithKey f (1, "") b
-  where
-    f (x, _) cell (lastKey, ac)
-      | x == lastKey = ( lastKey, ac ++ show cell )
-      | otherwise = ( x, ac ++ "\n" ++ show cell )
+instance Show BingoGame where
+  show (BingoGame bt _it)  = snd $ Map.foldWithKey f (1, "") bt
+    where
+      f (x, _) cell (lastKey, ac)
+        | x == lastKey = ( lastKey, ac ++ show cell )
+        | otherwise = ( x, ac ++ "\n" ++ show cell )
 
 instance Show Cell where
   -- TODO: How to colorize?
@@ -64,8 +65,14 @@ mkCellAt (x, y) i
   | x == center && y == center = CenterCell
   | otherwise = Cell i False
 
-{-mark :: BingoTable -> Int -> BingoTable-}
-{-mark bt i =-}
+markCell :: Int -> BingoGame -> BingoGame
+markCell i (BingoGame bt it) = BingoGame bt' it'
+  where
+    (ps', it') = Map.updateLookupWithKey f i it
+    f _ [] = Nothing
+    f _ [_] = Nothing
+    f _ (_:ps) = Just ps
+    bt' = maybe bt (\ (p:_) ->  Map.insert p (Cell i True) bt) ps'
 
 size :: Int
 size = 5
