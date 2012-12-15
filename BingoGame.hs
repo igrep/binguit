@@ -1,7 +1,8 @@
 module BingoGame
   (generateTable
-  ,BingoTable)
+  ,BingoTable) where
 
+import Control.Applicative
 import System.Random
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -22,11 +23,11 @@ instance Show Cell where
       -- assume j is between 1 and 75
       f j = if j < 10 then " " ++ show j else show j
 
-ganerateTable :: RandomGen g => g -> BingoTable
+-- TODO: How to not generate numbers already generated.
+--       Change the range of generated value by column
+generateTable :: RandomGen g => g -> BingoTable
 generateTable g =
-  -- TODO: How to not generate numbers already generated.
-  --       Change the range of generated value by column
-  Map.fromList $ map f $ zip points $ randoms g
+  BingoTable $ Map.fromList $ map f $ zip points $ randoms g
   where
     f (p, i) = (p, mkCellAt p i)
 
@@ -35,8 +36,4 @@ mkCellAt ('N', 3) _ = CenterCell
 mkCellAt p@(x, _y) i = Cell i False
 
 points :: [Point]
-points = pair <$> xs <*> ys
-  where
-    pair x y = (x, y)
-    xs = "BINGO"
-    ys = [1..5]
+points = (,) <$> "BINGO" <*> [1..5]
