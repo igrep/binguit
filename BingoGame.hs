@@ -8,24 +8,36 @@ import System.Random
 import qualified Data.Map as Map
 import Data.Map (Map)
 
-data BingoGame = BingoGame BingoTable InvertedTable
-{-data BingoGame =-}
-  {-BingoGame-}
-    {-{ table :: BingoTable-}
-    {-, invertedTable :: InvertedTable }-}
+-- data BingoGame = BingoGame BingoTable InvertedTable
+data BingoGame =
+  BingoGame
+    { table :: BingoTable
+    , invertedTable :: InvertedTable }
 type BingoTable = Map Point Cell
 type InvertedTable = Map Int [Point]
 type Point = (Int, Int)
+
 data Cell =
-  Cell { value :: Int, _isMarked :: Bool }
+  Cell { value :: Int, marked :: Bool }
   | CenterCell
+
+type Line = [Cell]
+
+getValue :: Cell -> Int
+getValue CenterCell = 0
+getValue c = value c
+isMarked :: Cell -> Bool
+isMarked CenterCell = True
+isMarked c = marked c
 
 -- TODO: use difflist
 instance Show BingoGame where
   show (BingoGame bt _it)  = snd $ Map.foldWithKey f (1, "") bt
     where
-      f (x, _) cell (lastKey, ac)
-        | x == lastKey = ( lastKey, ac ++ show cell )
+      f (x, _) cell (lastRow, ac)
+        -- processing a row same with the last one.
+        | x == lastRow = ( lastRow, ac ++ show cell )
+        -- processing row changed.
         | otherwise = ( x, ac ++ "\n" ++ show cell )
 
 instance Show Cell where
@@ -33,11 +45,11 @@ instance Show Cell where
   show CenterCell = "(  )"
   show (Cell i m) =
     if m
-      then "(" ++ f i ++ ")"
-      else " " ++ f i ++ " "
+      then "(" ++ i' ++ ")"
+      else " " ++ i' ++ " "
     where
-      -- assume j is between 1 and 75
-      f j = if j < 10 then " " ++ show j else show j
+      -- assume i is between 1 and 75
+      i' = if i < 10 then ' ':(show i) else show i
 
 newGame :: RandomGen g => g -> BingoGame
 newGame g = BingoGame bt it
@@ -49,16 +61,22 @@ newGame g = BingoGame bt it
 --       Change the range of generated value by column
 generateTable :: RandomGen g => g -> BingoTable
 generateTable g =
-  Map.fromDistinctAscList $ map f $ zip points $ randoms g
+  Map.fromDistinctAscList $ zipWith f points $ randoms g
   where
-    f (p, i) = (p, mkCellAt p (( i `mod` 75 ) + 1 :: Int))
+    f p i = attach p $ roundAsCellValue i
+
+attach :: Point -> Int -> (Point, Cell)
+attach p i = (p, mkCellAt p i)
+
+roundAsCellValue :: Int -> Int
+roundAsCellValue i = (abs i) `mod` 75 + 1
 
 invert :: BingoTable -> InvertedTable
 invert bt =
   Map.fromListWith (++) $ map (f . swap) $ Map.toAscList bt
   where
     swap (x1, x2) = (x2, x1)
-    f (y1, y2) = (value y1, y2:[])
+    f (y1, y2) = (getValue y1, y2:[])
 
 mkCellAt :: Point -> Int -> Cell
 mkCellAt (x, y) i
@@ -68,11 +86,18 @@ mkCellAt (x, y) i
 markCell :: Int -> BingoGame -> BingoGame
 markCell i (BingoGame bt it) = BingoGame bt' it'
   where
-    (ps', it') = Map.updateLookupWithKey f i it
-    f _ [] = Nothing
-    f _ [_] = Nothing
-    f _ (_:ps) = Just ps
+    (ps', it') = Map.updateLookupWithKey popPoint i it
+    popPoint _ [] = Nothing
+    popPoint _ (_:ps) = Just ps
     bt' = maybe bt (\ (p:_) ->  Map.insert p (Cell i True) bt) ps'
+
+lines :: BingoGame -> [Line]
+lines b = Map.foldWithKey f
+
+collectBingoLines = filter (all . isMarked)
+
+collectBingoLines :: [Line] -> [Line]
+collectBingoLines = filter (all . isMarked)
 
 size :: Int
 size = 5
