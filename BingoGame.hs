@@ -12,16 +12,22 @@ import Data.Map (Map)
 data BingoGame =
   BingoGame
     { table :: BingoTable
-    , invertedTable :: InvertedTable }
+    , invertedTable :: InvertedTable
+    , completingLines :: CompletingLines
+    , bingoLines :: [Line] }
 type BingoTable = Map Point Cell
 type InvertedTable = Map Int [Point]
+data CompletingLines =
+  CompletingLines Lines Lines -- only horiontal lines and vertical lines
+
+data Lines = Lines (Map Int Line) -- is Map really good?
+data Line = LineType (Seq Int)
+
 type Point = (Int, Int)
 
 data Cell =
   Cell { value :: Int, marked :: Bool }
   | CenterCell
-
-type Line = [Cell]
 
 getValue :: Cell -> Int
 getValue CenterCell = 0
@@ -90,14 +96,6 @@ markCell i (BingoGame bt it) = BingoGame bt' it'
     popPoint _ [] = Nothing
     popPoint _ (_:ps) = Just ps
     bt' = maybe bt (\ (p:_) ->  Map.insert p (Cell i True) bt) ps'
-
-lines :: BingoGame -> [Line]
-lines b = Map.foldWithKey f
-
-collectBingoLines = filter (all . isMarked)
-
-collectBingoLines :: [Line] -> [Line]
-collectBingoLines = filter (all . isMarked)
 
 size :: Int
 size = 5
