@@ -1,12 +1,17 @@
 module BingoGame
   (newGame
-  ,BingoGame
+  ,BingoGame(..)
   ,markCell) where
 
 import Control.Applicative
 import System.Random
 import qualified Data.Map as Map
 import Data.Map (Map)
+import qualified Data.IntMap as IntMap
+import Data.IntMap (IntMap)
+import qualified Data.Sequence as Seq
+import Data.Sequence (Seq)
+import qualified Data.Foldable as Foldable
 
 -- data BingoGame = BingoGame BingoTable InvertedTable
 data BingoGame =
@@ -14,14 +19,16 @@ data BingoGame =
     { table :: BingoTable
     , invertedTable :: InvertedTable
     , completingLines :: CompletingLines
-    , bingoLines :: [Line] }
+    , bingoLines :: Seq Line }
 type BingoTable = Map Point Cell
-type InvertedTable = Map Int [Point]
+type InvertedTable = IntMap [Point]
 data CompletingLines =
-  CompletingLines Lines Lines -- only horiontal lines and vertical lines
+  -- is Map really good?
+  CompletingLines (IntMap Line) (IntMap Line) -- only horizontal lines and vertical lines so far.
 
-data Lines = Lines (Map Int Line) -- is Map really good?
-data Line = LineType (Seq Int)
+data Line = Line Direction (Seq Point)
+-- only horizontal lines and vertical lines so far.
+data Direction = Horizontal | Vertical deriving (Show)
 
 type Point = (Int, Int)
 
@@ -36,15 +43,24 @@ isMarked :: Cell -> Bool
 isMarked CenterCell = True
 isMarked c = marked c
 
--- TODO: use difflist
+-- TODO: use blaze-builder
 instance Show BingoGame where
-  show (BingoGame bt _it)  = snd $ Map.foldWithKey f (1, "") bt
-    where
-      f (x, _) cell (lastRow, ac)
-        -- processing a row same with the last one.
-        | x == lastRow = ( lastRow, ac ++ show cell )
-        -- processing row changed.
-        | otherwise = ( x, ac ++ "\n" ++ show cell )
+  show (BingoGame bt _it _cl bl)  = showTable bt ++ showBingos bl
+
+showTable :: BingoTable -> String
+showTable bt = snd $ Map.foldWithKey build (1, "") bt
+  where
+    build (x, _) cell (lastRow, ac)
+      -- processing a row same with the last one.
+      | x == lastRow = ( lastRow, ac ++ show cell )
+      -- processing row changed.
+      | otherwise = ( x, ac ++ "\n" ++ show cell )
+
+showBingos :: Seq Line -> String
+showBingos = Foldable.foldr buildBingos ""
+  where
+    buildBingos (Line d ps) ac =
+      "BINGO! " ++ show d ++ ": " ++ show ps ++ ""
 
 instance Show Cell where
   -- TODO: How to colorize?
@@ -58,10 +74,12 @@ instance Show Cell where
       i' = if i < 10 then ' ':(show i) else show i
 
 newGame :: RandomGen g => g -> BingoGame
-newGame g = BingoGame bt it
+newGame g = BingoGame bt it cl bl
   where
     bt = generateTable g
     it = invert bt
+    cl = noMarkedLines
+    bl = Seq.empty
 
 -- TODO: How to not generate numbers already generated.
 --       Change the range of generated value by column
@@ -75,24 +93,27 @@ attach :: Point -> Int -> (Point, Cell)
 attach p i = (p, mkCellAt p i)
 
 roundAsCellValue :: Int -> Int
-roundAsCellValue i = (abs i) `mod` 75 + 1
-
-invert :: BingoTable -> InvertedTable
-invert bt =
-  Map.fromListWith (++) $ map (f . swap) $ Map.toAscList bt
-  where
-    swap (x1, x2) = (x2, x1)
-    f (y1, y2) = (getValue y1, y2:[])
+roundAsCellValue i = ((abs i) `mod` 75) + 1
 
 mkCellAt :: Point -> Int -> Cell
 mkCellAt (x, y) i
   | x == center && y == center = CenterCell
   | otherwise = Cell i False
 
+invert :: BingoTable -> InvertedTable
+invert bt =
+  IntMap.fromListWith (++) $ map (f . swap) $ Map.toAscList bt
+  where
+    swap (x1, x2) = (x2, x1)
+    f (y1, y2) = (getValue y1, y2:[])
+
+noMarkedLines :: CompletingLines
+noMarkedLines = CompletingLines IntMap.empty IntMap.empty
+
 markCell :: Int -> BingoGame -> BingoGame
 markCell i (BingoGame bt it) = BingoGame bt' it'
   where
-    (ps', it') = Map.updateLookupWithKey popPoint i it
+    (ps', it') = IntMap.updateLookupWithKey popPoint i it
     popPoint _ [] = Nothing
     popPoint _ (_:ps) = Just ps
     bt' = maybe bt (\ (p:_) ->  Map.insert p (Cell i True) bt) ps'
