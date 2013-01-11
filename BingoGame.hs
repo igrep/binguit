@@ -10,7 +10,7 @@ import Data.Map (Map)
 import qualified Data.IntMap as IntMap
 import Data.IntMap (IntMap)
 import qualified Data.Sequence as Seq
-import Data.Sequence (Seq)
+import Data.Sequence (Seq, (|<))
 import qualified Data.Foldable as Foldable
 
 -- data BingoGame = BingoGame BingoTable InvertedTable
@@ -60,7 +60,7 @@ showBingos :: Seq Line -> String
 showBingos = Foldable.foldr buildBingos ""
   where
     buildBingos (Line d ps) ac =
-      "BINGO! " ++ show d ++ ": " ++ show ps ++ ""
+      "BINGO! " ++ show d ++ ": " ++ show ps ++ "\n" ++ ac
 
 instance Show Cell where
   -- TODO: How to colorize?
@@ -111,12 +111,20 @@ noMarkedLines :: CompletingLines
 noMarkedLines = CompletingLines IntMap.empty IntMap.empty
 
 markCell :: Int -> BingoGame -> BingoGame
-markCell i (BingoGame bt it) = BingoGame bt' it'
+markCell i (BingoGame bt it cl bl) = BingoGame bt' it' cl' bl'
   where
     (ps', it') = IntMap.updateLookupWithKey popPoint i it
+
     popPoint _ [] = Nothing
     popPoint _ (_:ps) = Just ps
-    bt' = maybe bt (\ (p:_) ->  Map.insert p (Cell i True) bt) ps'
+
+    newCell = (Cell i True)
+
+    bt' = maybe bt whenJust1 ps'
+    whenJust1 (p:_) = Map.insert p newCell bt
+
+    (bs, cl') = updateLookupBingos cl 
+    bl' = maybe bl whenJust2 bs
 
 size :: Int
 size = 5
