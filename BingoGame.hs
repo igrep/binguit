@@ -5,6 +5,7 @@ module BingoGame
 
 import Control.Applicative
 import System.Random
+import Data.List (intersperse)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.IntMap as IntMap
@@ -13,20 +14,20 @@ import qualified Data.Sequence as Seq
 import Data.Sequence (Seq, (|<))
 import qualified Data.Foldable as Foldable
 
--- data BingoGame = BingoGame BingoTable InvertedTable
 data BingoGame =
   BingoGame
     { table :: BingoTable
     , invertedTable :: InvertedTable
     , completingLines :: CompletingLines
-    , bingoLines :: Seq Line }
+    , bingoLines :: BingoLines }
 type BingoTable = Map Point Cell
 type InvertedTable = IntMap [Point]
 data CompletingLines =
-  -- is Map really good?
+  -- is IntMap really good?
   CompletingLines (IntMap Line) (IntMap Line) -- only horizontal lines and vertical lines so far.
+type BingoLines = Seq (Direction, Int, Line)
 
-data Line = Line Direction (Seq Point)
+type Line = IntMap Cell
 -- only horizontal lines and vertical lines so far.
 data Direction = Horizontal | Vertical deriving (Show)
 
@@ -56,11 +57,14 @@ showTable bt = snd $ Map.foldWithKey build (1, "") bt
       -- processing row changed.
       | otherwise = ( x, ac ++ "\n" ++ show cell )
 
-showBingos :: Seq Line -> String
+showBingos :: BingoLines -> String
 showBingos = Foldable.foldr buildBingos ""
   where
-    buildBingos (Line d ps) ac =
-      "BINGO! " ++ show d ++ ": " ++ show ps ++ "\n" ++ ac
+    buildBingos (d, i, l) ac =
+      "BINGO! " ++ show d ++ " #" ++ show i ++ " : " ++ showLine l ++ "\n" ++ ac
+
+showLine :: Line -> String
+showLine = intersperse " " $ map (show . snd) $ IntMap.toAscList
 
 instance Show Cell where
   -- TODO: How to colorize?
@@ -108,7 +112,9 @@ invert bt =
     f (y1, y2) = (getValue y1, y2:[])
 
 noMarkedLines :: CompletingLines
-noMarkedLines = CompletingLines IntMap.empty IntMap.empty
+noMarkedLines = CompletingLines onlyCenter onlyCenter
+  where
+    onlyCenter = IntMap.singleton center $ IntMap.singleton center CenterCell
 
 markCell :: Int -> BingoGame -> BingoGame
 markCell i (BingoGame bt it cl bl) = BingoGame bt' it' cl' bl'
@@ -118,13 +124,34 @@ markCell i (BingoGame bt it cl bl) = BingoGame bt' it' cl' bl'
     popPoint _ [] = Nothing
     popPoint _ (_:ps) = Just ps
 
-    newCell = (Cell i True)
+    (bt', cl', bl') =
+      maybe (bt, cl, bl) $ (updateWithPoints (bt, cl, bl) i) ps'
 
-    bt' = maybe bt whenJust1 ps'
-    whenJust1 (p:_) = Map.insert p newCell bt
+updateWithPoints ::
+  (BingoTable, CompletingLines, BingoLines) -> Int -> [Point]
+    -> (BingoTable, CompletingLines, BingoLines)
+updateWithPoints b _ [] = b
+updateWithPoints (bt, cl, bl) i (p:_) = (bt', cl', bl')
+  where
+    c' = (Cell i True) -- marked cell
+    bt' = Map.insert p c' bt
+    (cl', bl') = updateCollectBingos p c' cl bl
 
-    (bs, cl') = updateLookupBingos cl 
-    bl' = maybe bl whenJust2 bs
+updateCollectBingos ::
+  Point -> Cell -> CompletingLines -> BingoLines
+    -> (CompletingLines, BingoLines)
+updateCollectBingos (x, y) c (CompletingLines h v) bl =
+  (CompletingLines h' v', bl')
+  where
+    (ys', h') = IntMap.insertLookupWithKey appendToLine y h
+    (xs', v') = IntMap.insertLookupWithKey appendToLine x v
+    appendToLine 
+    bl' =
+      appendIfBingo Vertical xs' $
+        appendIfBingo Horizontal ys' bl
+
+appendIfBingo :: Direction -> Line -> BingoLines -> BingoLines
+appendIfBingo d l bl =
 
 size :: Int
 size = 5
