@@ -11,7 +11,6 @@ import Data.Map (Map)
 import qualified Data.IntMap as IntMap
 import Data.IntMap (IntMap)
 import qualified Data.Sequence as Seq
-import Data.Sequence (Seq, (|<))
 import qualified Data.Foldable as Foldable
 
 data BingoGame =
@@ -25,7 +24,7 @@ type InvertedTable = IntMap [Point]
 data CompletingLines =
   -- is IntMap really good?
   CompletingLines (IntMap Line) (IntMap Line) -- only horizontal lines and vertical lines so far.
-type BingoLines = Seq (Direction, Int, Line)
+type BingoLines = [ (Direction, Int, Line) ]
 
 type Line = IntMap Cell
 -- only horizontal lines and vertical lines so far.
@@ -64,7 +63,7 @@ showBingos = Foldable.foldr buildBingos ""
       "BINGO! " ++ show d ++ " #" ++ show i ++ " : " ++ showLine l ++ "\n" ++ ac
 
 showLine :: Line -> String
-showLine = intersperse " " $ map (show . snd) $ IntMap.toAscList
+showLine = concat . intersperse " " . map (show . snd) . IntMap.toAscList
 
 instance Show Cell where
   -- TODO: How to colorize?
@@ -82,8 +81,8 @@ newGame g = BingoGame bt it cl bl
   where
     bt = generateTable g
     it = invert bt
-    cl = noMarkedLines
-    bl = Seq.empty
+    cl = initialLines
+    bl = []
 
 -- TODO: How to not generate numbers already generated.
 --       Change the range of generated value by column
@@ -111,8 +110,8 @@ invert bt =
     swap (x1, x2) = (x2, x1)
     f (y1, y2) = (getValue y1, y2:[])
 
-noMarkedLines :: CompletingLines
-noMarkedLines = CompletingLines onlyCenter onlyCenter
+initialLines :: CompletingLines
+initialLines = CompletingLines onlyCenter onlyCenter
   where
     onlyCenter = IntMap.singleton center $ IntMap.singleton center CenterCell
 
@@ -125,7 +124,7 @@ markCell i (BingoGame bt it cl bl) = BingoGame bt' it' cl' bl'
     popPoint _ (_:ps) = Just ps
 
     (bt', cl', bl') =
-      maybe (bt, cl, bl) $ (updateWithPoints (bt, cl, bl) i) ps'
+      maybe (bt, cl, bl) (updateWithPoints (bt, cl, bl) i) ps'
 
 updateWithPoints ::
   (BingoTable, CompletingLines, BingoLines) -> Int -> [Point]
@@ -143,15 +142,20 @@ updateCollectBingos ::
 updateCollectBingos (x, y) c (CompletingLines h v) bl =
   (CompletingLines h' v', bl')
   where
-    (ys', h') = IntMap.insertLookupWithKey appendToLine y h
-    (xs', v') = IntMap.insertLookupWithKey appendToLine x v
-    appendToLine 
+    ys = IntMap.singleton y c
+    xs = IntMap.singleton x c
+    -- Bug: insertLookupWithKey returns unchanged value.
+    (ys', h') = IntMap.insertLookupWithKey appendToLine y ys h
+    (xs', v') = IntMap.insertLookupWithKey appendToLine x xs v
+    appendToLine _k l1 l2 = IntMap.union l1 l2
     bl' =
-      appendIfBingo Vertical xs' $
-        appendIfBingo Horizontal ys' bl
+      appendIfBingo Vertical x xs' $
+        appendIfBingo Horizontal y ys' bl
 
-appendIfBingo :: Direction -> Line -> BingoLines -> BingoLines
-appendIfBingo d l bl =
+appendIfBingo :: Direction -> Int -> Line -> BingoLines -> BingoLines
+appendIfBingo d i l bl
+  | IntMap.size l == size =  (d, i, l):bl
+  | otherwise = bl
 
 size :: Int
 size = 5
