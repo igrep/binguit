@@ -142,12 +142,15 @@ updateCollectBingos ::
 updateCollectBingos (x, y) c (CompletingLines h v) bl =
   (CompletingLines h' v', bl')
   where
-    ys = IntMap.singleton y c
-    xs = IntMap.singleton x c
-    -- Bug: insertLookupWithKey returns unchanged value.
-    (ys', h') = IntMap.insertLookupWithKey appendToLine y ys h
-    (xs', v') = IntMap.insertLookupWithKey appendToLine x xs v
-    appendToLine _k l1 l2 = IntMap.union l1 l2
+    h' = IntMap.alter appendToLine y c h
+    v' = IntMap.alter appendToLine x c v
+
+    appendToLine k Nothing c = IntMap.singleton k c
+    appendToLine k (Just l) c = IntMap.insert k c l
+
+    ys' = (IntMap.!) h' y
+    xs' = (IntMap.!) v' x
+
     bl' =
       appendIfBingo Vertical x xs' $
         appendIfBingo Horizontal y ys' bl
