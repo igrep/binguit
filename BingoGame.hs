@@ -1,6 +1,7 @@
 module BingoGame
-  (newGame
-  ,BingoGame(..)
+  (BingoGame(..)
+  ,newGame
+  ,chooseRandomNumbers
   ,markCell) where
 
 import Control.Applicative
@@ -10,7 +11,6 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.IntMap as IntMap
 import Data.IntMap (IntMap)
-import qualified Data.Sequence as Seq
 import qualified Data.Foldable as Foldable
 
 data BingoGame =
@@ -33,19 +33,19 @@ data Direction = Horizontal | Vertical deriving (Show)
 type Point = (Int, Int)
 
 data Cell =
-  Cell { value :: Int, marked :: Bool }
+  Cell { value :: Int, _marked :: Bool }
   | CenterCell
 
 getValue :: Cell -> Int
 getValue CenterCell = 0
 getValue c = value c
-isMarked :: Cell -> Bool
-isMarked CenterCell = True
-isMarked c = marked c
+{-isMarked :: Cell -> Bool-}
+{-isMarked CenterCell = True-}
+{-isMarked c = marked c-}
 
 -- TODO: use blaze-builder
 instance Show BingoGame where
-  show (BingoGame bt _it _cl bl)  = showTable bt ++ showBingos bl
+  show (BingoGame bt _it _cl bl) = showTable bt ++ "\n" ++ showBingos bl
 
 showTable :: BingoTable -> String
 showTable bt = snd $ Map.foldWithKey build (1, "") bt
@@ -73,7 +73,7 @@ instance Show Cell where
       then "(" ++ i' ++ ")"
       else " " ++ i' ++ " "
     where
-      -- assume i is between 1 and 75
+      -- assume i is between 1 and 75, which is 2 digit number.
       i' = if i < 10 then ' ':(show i) else show i
 
 newGame :: RandomGen g => g -> BingoGame
@@ -84,31 +84,36 @@ newGame g = BingoGame bt it cl bl
     cl = initialLines
     bl = []
 
+chooseRandomNumbers :: RandomGen g => g -> [Int]
+chooseRandomNumbers = randomRs (1, 75)
+
 -- TODO: How to not generate numbers already generated.
 --       Change the range of generated value by column
 generateTable :: RandomGen g => g -> BingoTable
-generateTable g =
-  Map.fromDistinctAscList $ zipWith f points $ randoms g
+generateTable =
+  Map.fromDistinctAscList . zipWith attach ps . chooseRandomNumbers
   where
-    f p i = attach p $ roundAsCellValue i
+    ps = (,) <$> [1..size] <*> [1..size]
 
 attach :: Point -> Int -> (Point, Cell)
 attach p i = (p, mkCellAt p i)
 
-roundAsCellValue :: Int -> Int
-roundAsCellValue i = ((abs i) `mod` 75) + 1
+-- needless as long as not change value by column
+-- roundAsCellValue :: Int -> Int
+-- roundAsCellValue i = ((abs i) `mod` 75) + 1
 
 mkCellAt :: Point -> Int -> Cell
-mkCellAt (x, y) i
-  | x == center && y == center = CenterCell
+mkCellAt p i
+  | isCenterPoint p = CenterCell
   | otherwise = Cell i False
 
 invert :: BingoTable -> InvertedTable
-invert bt =
-  IntMap.fromListWith (++) $ map (f . swap) $ Map.toAscList bt
+invert =
+  IntMap.fromListWith (++) . map (f2 . swap) . filter f1 . Map.toAscList
   where
     swap (x1, x2) = (x2, x1)
-    f (y1, y2) = (getValue y1, y2:[])
+    f1 (p, _) = isCenterPoint p
+    f2 (y1, y2) = (getValue y1, y2:[])
 
 initialLines :: CompletingLines
 initialLines = CompletingLines onlyCenter onlyCenter
@@ -142,11 +147,11 @@ updateCollectBingos ::
 updateCollectBingos (x, y) c (CompletingLines h v) bl =
   (CompletingLines h' v', bl')
   where
-    h' = IntMap.alter appendToLine y c h
-    v' = IntMap.alter appendToLine x c v
+    h' = IntMap.alter (appendToLine x) y h
+    v' = IntMap.alter (appendToLine y) x v
 
-    appendToLine k Nothing c = IntMap.singleton k c
-    appendToLine k (Just l) c = IntMap.insert k c l
+    appendToLine k Nothing = Just $ IntMap.singleton k c
+    appendToLine k (Just l) = Just $ IntMap.insert k c l
 
     ys' = (IntMap.!) h' y
     xs' = (IntMap.!) v' x
@@ -168,5 +173,5 @@ center = d + m
   where
     (d, m) = size `divMod` 2
 
-points :: [Point]
-points = (,) <$> [1..size] <*> [1..size]
+isCenterPoint :: Point -> Bool
+isCenterPoint (x, y) = x == center && y == center
