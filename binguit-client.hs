@@ -44,6 +44,7 @@ binguit bingo = do
              putStrLnL $ "Got " ++ show n ++ ". Can any cell marked...?"
              liftIO $ threadDelay sec
              let bingo' = BingoGame.markCell n bingo
+             putStrLnL $ BingoGame.debug bingo'
              printL bingo'
              binguit bingo'
   where

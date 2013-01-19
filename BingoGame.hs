@@ -1,5 +1,7 @@
+{-# LANGUAGE Rank2Types #-}
 module BingoGame
   (BingoGame(..)
+  ,debug
   ,newGame
   ,chooseRandomNumbers
   ,markCell) where
@@ -21,9 +23,8 @@ data BingoGame =
     , bingoLines :: BingoLines }
 type BingoTable = Map Point Cell
 type InvertedTable = IntMap [Point]
-data CompletingLines =
-  -- is IntMap really good?
-  CompletingLines (IntMap Line) (IntMap Line) -- only horizontal lines and vertical lines so far.
+-- only horizontal lines and vertical lines so far.
+data CompletingLines = CompletingLines (IntMap Line) (IntMap Line) deriving Show
 type BingoLines = [ (Direction, Int, Line) ]
 
 type Line = IntMap Cell
@@ -86,6 +87,14 @@ newGame g = BingoGame bt it cl bl
 
 chooseRandomNumbers :: RandomGen g => g -> [Int]
 chooseRandomNumbers = randomRs (1, 75)
+
+debug :: BingoGame -> String
+debug (BingoGame bt it cl bl) =
+  concat $ intersperse "\n" $
+    [ "Table: " ++ show bt
+    , "Inverted: " ++ show it
+    , "Completing: " ++ show cl
+    , "Bingos: " ++ show bl ]
 
 -- TODO: How to not generate numbers already generated.
 --       Change the range of generated value by column
